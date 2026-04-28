@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // User Validation
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.xp is int && data.xp >= 0 &&
+             data.streak is int && data.streak >= 0;
+    }
+
+    // Solution Validation
+    function isValidSolution(data) {
+      return data.userId == request.auth.uid &&
+             data.query is string && data.query.size() <= 2000 &&
+             data.explanation is string && data.explanation.size() <= 10000;
+    }
+
+    // User Resource
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'xp', 'streak', 'badges', 'lastActive'])
+      );
+    }
+
+    // Solutions Resource
+    match /solutions/{solutionId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(solutionId) && isValidSolution(incoming()) && incoming().createdAt == request.time;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    // Chat History
+    match /users/{userId}/messages/{messageId} {
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && incoming().userId == userId && incoming().createdAt == request.time;
+    }
+  }
+}

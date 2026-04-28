@@ -1,0 +1,6 @@
+{
+  "name": "SolveSphere AI",
+  "description": "A comprehensive academic doubt-solving platform for students with multi-format AI explanations, tutor chat, and gamified quizzes.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["AI-powered explanations", "Image OCR", "Voice input/output", "Dynamic PPT generation", "Multi-language support"]
+}
